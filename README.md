@@ -18,7 +18,7 @@ Logfile for script.
 Outputs a report of all the currently open ports for all known hosts.
 
 - **scans directory**
-Directory to hold the XML output of NMAP scans. Scans are automaticaly dleted when the script is done parsing them.
+Directory to hold the XML output of NMAP scans. Scans are automaticaly deleted when the script is done parsing them.
 
 - **schedule.csv**
 The schedule of what subnets to scan. 
