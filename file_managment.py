@@ -56,9 +56,9 @@ class scan_host:
         self.is_new = is_new
         self.host_names = host_names 
         
-        if ip_version == "ipv4":
+        if ip_version.lower() == "ipv4":
             self.host_ip = ipaddr.IPv4Address(host_ip_string)
-        elif ip_version == "ipv6":
+        elif ip_version.lower() == "ipv6":
             self.host_ip = ipaddr.IPv6Address(host_ip_string)
         else:
             raise AssertionError("Error creating host IP")
