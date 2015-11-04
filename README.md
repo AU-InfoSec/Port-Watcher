@@ -1,6 +1,11 @@
 # Port-Watcher
 This script is a wrapper for NMAP, that manages a schedule and list of subnets to scan. Once a scan is complete an email is sent with a report of the latest scan.
 
+### Requirements:
+
+- Python 2.7 or higher
+- NMAP 6.47 or higher
+
 ## File Structure:
 
 - **config.json** Config file for this script.
