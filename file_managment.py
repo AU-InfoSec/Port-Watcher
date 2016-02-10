@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import csv
 import datetime
 import ipaddr
 import json
@@ -43,6 +44,20 @@ class host_list:
 
         with open(file_path, 'w') as outfile:
             json.dump(list_obj, outfile)
+
+class scan_history:
+    scan_file_str = ""
+
+    def __init__(self, scan_history_file_location):
+        scan_file_str = scan_history_file_location
+
+    def append_entry(self, entry_text):
+        with open(self.scan_file_str, "a") as myfile:
+            myfile.write(entry_text)
+
+    def clear_scan_history(self):
+        with open(self.scan_file_str, "w") as myfile:
+            myfile.write("")
 
 class scan_host:
     host_ip     = None
@@ -128,8 +143,11 @@ class scan_host:
 
         return [latest_scan, second_latest_scan]
     
-    def open_new_scan(self, unix_time):
-        self.latest_scan = scan_instance(unix_time, [])
+    def open_new_scan(self, unix_time, host_found):
+	if (host_found == False):
+		logger("Saving empty scan.")
+
+        self.latest_scan = scan_instance(unix_time, [], host_found)
         self.scans.append(self.latest_scan)
         
     def write_json(self):
@@ -138,6 +156,7 @@ class scan_host:
             scan_obj = {}
             scan_obj["unix_time"]  = int(scan.unix_time)
             scan_obj["open_ports"] = scan.open_ports            
+	    scan_obj["host_found"] = scan.host_found
             scans_list.append(scan_obj)
             
         json_data = {}
@@ -152,11 +171,13 @@ class scan_host:
 class scan_instance:
     unix_time = 0;
     open_ports = []
+    host_found = False;
 
-    def __init__(self, unix_time, open_ports=[]):
+    def __init__(self, unix_time, open_ports=[], found_host=True):
         self.open_ports = open_ports
         self.unix_time  = unix_time
-    
+    	self.host_found = found_host
+
     def __str__(self):
         return str(self.open_ports)
 
@@ -326,7 +347,13 @@ def get_host(ip_str, ip_ver):
         for scan in scans:
             unix_time  = scan['unix_time']
             open_ports = scan['open_ports']
-            new_scan   = scan_instance(unix_time, open_ports)
+	    
+	    if 'host_found' in scan:
+		host_found = scan['host_found']
+	    else:
+		host_found = True
+
+            new_scan   = scan_instance(unix_time, open_ports, host_found)
             host_obj.add_scan(new_scan)
     else:
         host_obj = scan_host(ip_str, ip_ver, True)
@@ -374,5 +401,3 @@ else:
 scan_directory = script_dir + "/scans/"
 hosts_directory = script_dir + "/hosts/"
 schedule_file = script_dir +  "/schedule.csv"
-
-print hosts_directory
