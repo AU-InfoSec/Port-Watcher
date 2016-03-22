@@ -335,7 +335,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 
             #Send Email
             if (send_email == True):
-                au_email.send_email('mailout.american.edu', email_form, imap_username, email_pass, 'dhuse@american.edu', email_subject, email_body)
+                au_email.send_email('mailout.american.edu', email_form, imap_username, email_pass, 'email@domain.com', email_subject, email_body)
                 if debug == True: print "Email Sent."
 		file_managment.logger("Email Sent.")
             else:
