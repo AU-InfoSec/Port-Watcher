@@ -43,7 +43,7 @@ def load_config_file(file_location):
 
     except:
 	file_managment.logger("Error loading config.")
-	print "Error loading config."	
+	print "Error loading config."
 
 def parse_nmap_xml_for_hosts(xml_doc):
     hosts_array = []
@@ -54,7 +54,7 @@ def parse_nmap_xml_for_hosts(xml_doc):
     for host in doc.getElementsByTagName("host"):
         addr_element = host.getElementsByTagName("address")[0]
         ip = addr_element.getAttribute("addr")
-        
+
 	try:
 		ip_ver = addr_element.getAttribute("addrtype")
         except Exception as e:
@@ -66,7 +66,7 @@ def parse_nmap_xml_for_hosts(xml_doc):
 
 def parse_nmap_xml(xml_doc, debug=False):
     scan_results = []
-    
+
     # Parse Scan Information
     try:
     	doc = minidom.parse(xml_doc)
@@ -74,8 +74,8 @@ def parse_nmap_xml(xml_doc, debug=False):
     	    try:
 		run_time_unix = int(nmaprun_tag.getAttribute("start"))
 	    except Exception as e:
-		run_time_unix = int(time.time())    
-	
+		run_time_unix = int(time.time())
+
     	    # Find all hosts from scan
     	    for host in doc.getElementsByTagName("host"):
       		if debug == True:
@@ -84,28 +84,28 @@ def parse_nmap_xml(xml_doc, debug=False):
 	  	addr_element = host.getElementsByTagName("address")[0]
         	ip     = addr_element.getAttribute("addr")
         	ip_ver = addr_element.getAttribute("addrtype")
-		
+
         	#see if host exists, create a new one if it does not
         	new_host = file_managment.get_host(str(ip), ip_ver)
-		
+
         	#Open a new scan for the host
         	new_host.open_new_scan(run_time_unix, True)
-        	
+
         	#Parse ports from scan
 		if debug == True:
 			file_managment.logger("Getting ports tag.")
 
         	ports_tag = host.getElementsByTagName("ports")[0]
    		port_tags = ports_tag.getElementsByTagName("port")
- 
+
 		#Debug info for ports
-		file_managment.logger("Scan found " + str(len(port_tags)) + " ports.")    
-	
+		file_managment.logger("Scan found " + str(len(port_tags)) + " ports.")
+
         	for port in port_tags:
             		port_number = int(port.getAttribute("portid"))
             		state_tag   = port.getElementsByTagName("state")[0]
             		port_status = state_tag.getAttribute("state")
-            		
+
     	        	if port_status == "open":
         	        	new_host.add_open_port_to_latest_scan(port_number)
 				if debug == True:
@@ -113,7 +113,7 @@ def parse_nmap_xml(xml_doc, debug=False):
 
         	#Record if new host, or new ports are found
         	port_changes = new_host.find_port_changes()
-		
+
         	if new_host.is_new == True:
             		#Newly found host
             		scan_results.append(["New Host", new_host.host_ip, port_changes])
@@ -133,12 +133,12 @@ def parse_nmap_xml(xml_doc, debug=False):
 	#Error parsing xml
 	file_managment.logger("Error in script: " + str(e))
 	file_managment.logger("XML File: " + xml_doc)
-	
+
 	with open(xml_doc, 'r') as content_file:
     		file_managment.logger("XML File: " + content_file.read())
 
 	return scan_results
-	
+
 def run_group_scan(subnets_info, group_id, full_scan=True, debug=False):
     # Get a list of subnets to scan
     subnets = subnets_info.get_subnets_by_group(group_id)
@@ -147,7 +147,7 @@ def run_group_scan(subnets_info, group_id, full_scan=True, debug=False):
     subnet_str_list = ""
     for subnet in subnets:
 	 subnet_str_list = subnet_str_list + str(subnet.subnet) + " "
- 
+
     #create log text
     if full_scan == True:
 	log_text = "Group ID: " + group_id + " Full scan of subnets: " + str(subnet_str_list)
@@ -164,7 +164,7 @@ def run_group_scan(subnets_info, group_id, full_scan=True, debug=False):
 def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
     scanned_ips = []
     host_count  = 0
-    
+
     #get next scan and run it
     next_scan = schedule_obj.get_next_schedule_entry(debug)
 
@@ -184,7 +184,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
             group_results = run_group_scan(subnets_info, next_scan.group, next_scan.full_scan, debug)
         else:
 	    group_results = []
- 
+
         if (len(next_scan.tags) > 0):
             if debug == True: print "Scanning Tags: " + str(next_scan.tags)
 	    file_managment.logger("Scanning Tags: " + str(next_scan.tags))
@@ -192,7 +192,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
             for tag in next_scan.tags:
                 for subnet in subnets_info.get_subnets_by_tag(tag):
                     scanned_ips.extend(subnet.get_ips())
-                
+
             tag_results = run_scan_on_tags(subnets_info, next_scan.tags, next_scan.full_scan, debug)
 	else:
             tag_results = []
@@ -202,7 +202,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
         time_delta = (str(scan_end_time - scan_start_time).split('.'))[0]
         if debug == True: print "Scanning completed, total time: " + str(time_delta)
 	file_managment.logger("Scanning completed, total time: " + str(time_delta))
-        
+
         #update schedule entry last run time
         if debug == True: print "Updating scan schedule..."
 	file_managment.logger("Updating scan schedule...")
@@ -211,23 +211,23 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
         schedule_obj.write_schedule()
         if debug == True: print "Scan schedule updated"
 	file_managment.logger("Scan schedule updated")
-        
+
         #Check for mising hosts
         if debug == True: print "Finding missing hosts..."
 	file_managment.logger("Finding missing hosts...")
 
         existing_hosts = []
-        
+
 	for scanned_ip in scanned_ips:
             json_file = hosts_directory + str(scanned_ip) + ".json"
-            
+
             if os.path.exists(json_file):
                 existing_hosts.append(str(scanned_ip))
 
                 try:
 			# Get host object
 			new_host = file_managment.get_host(str(scanned_ip), "IPv4")
-			
+
 			# Check to see if the last scan was blank
 			latest_scans = new_host.get_latest_scans()
 
@@ -237,7 +237,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 			else:
 				if len(latest_scans[0].open_ports) == 0:
 					existing_hosts.remove(str(scanned_ip))
-					file_managment.logger("Removing missing host: " + str(scanned_ip) + " from list, because last scan was empty.")				
+					file_managment.logger("Removing missing host: " + str(scanned_ip) + " from list, because last scan was empty.")
 
 					# Open a new scan, recording that the host was not found.
 					new_host.open_new_scan(str(int(time.time())), False)
@@ -245,9 +245,9 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 					# Record new scan, with host not being found.
                 			new_host.write_json()
                 			file_managment.logger("Host " + str(new_host.host_ip) + " JSON updated - Host Not Found.")
- 		
-		except Exception, e: 
-			file_managment.logger("Error creating blank scan for missing host. " + str(e))	
+
+		except Exception, e:
+			file_managment.logger("Error creating blank scan for missing host. " + str(e))
 
         if (send_email == True):
             send_email    = False
@@ -260,7 +260,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 		email_body += "Type: Top ports scan.\n"
 
             email_body   += "Time elapsed: " + time_delta + "\n\n"
-            
+
 	    if len(group_results) == 0 and len(tag_results[0]) == 0:
 		email_body += "No changed found."
 		# record no changes scan
@@ -268,13 +268,13 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 		scan_history.append_entry(history_line)
 		send_email = False
 
-            for result in group_results: 
+            for result in group_results:
                 for host in result:
                     if (host[0] == "New Host"):
                         host_status = "New Host"
                     else:
                         host_status = ""
-			
+
 	            try:
 		    	host_name = str(socket.gethostbyaddr(str(host[1]))[0])
 		    except Exception:
@@ -320,10 +320,10 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
             if (len(existing_hosts) > 0):
                 email_body += "Missing Hosts:\n\t"
                 send_email  = True
-                
+
                 for host_ip in existing_hosts:
                     email_body += host_ip + "\n\t"
-			
+
 		    # Record a new blank scan since the host was not found
 		    new_missing_host = file_managment.get_host(str(host_ip), "IPv4")
 		    new_missing_host.open_new_scan(str(int(time.time())), False)
@@ -332,7 +332,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 
 	    if (host_count == 0):
 		email_body += "No changes found.\n"
-                
+
             #Send Email
             if (send_email == True):
                 au_email.send_email('mailout.american.edu', email_form, imap_username, email_pass, 'dhuse@american.edu', email_subject, email_body)
@@ -340,7 +340,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 		file_managment.logger("Email Sent.")
             else:
                 if debug == True: print "No changes, not sending email."
-		file_managment.logger("No changes.")            	
+		file_managment.logger("No changes.")
 
     else:
         if debug == True: print "No scans pending."
@@ -349,11 +349,11 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 def run_scan(subnets, full_scan=True, debug=False):
     hosts_arr = []
     results = []
-    
+
     for subnet in subnets:
         #Detect hosts for subnets in group
-        run_scan_for_hosts(subnet.subnet) 
-    
+        run_scan_for_hosts(subnet.subnet)
+
         #parse the hosts scan results
         hosts_arr.extend(parse_nmap_xml_for_hosts(scan_directory + "latest_hosts_scan.xml"))
 
@@ -366,11 +366,11 @@ def run_scan(subnets, full_scan=True, debug=False):
 
         file_managment.logger(log_text)
         run_scan_on_host(host_entry[0])
-        
+
 	file_managment.logger("Parsing scan for host: " + host_entry[0])
 	scan_results = parse_nmap_xml(scan_directory + "latest_scan." + str(instance_number) + ".xml")
         results.append(scan_results)
-        
+
 	try:
 	    os.remove(scan_directory + "latest_scan." + str(instance_number) + ".xml")
 	except Exception, e:
@@ -379,19 +379,19 @@ def run_scan(subnets, full_scan=True, debug=False):
 
         if debug == True:
             print scan_results
-        
+
     #remove hosts scan file
     try:
         os.remove(scan_directory + "latest_hosts_scan.xml")
     except Exception, e:
         if debug == True: print "Error deleting latest_hosts_scan.xml" + str(e)
 	file_managment.logger("Error deleting latest_hosts_scan.xml" + str(e))
-        
+
     return results
 
 def run_scan_for_hosts(network):
     scan_file = scan_directory + "latest_hosts_scan.xml"
-    
+
     nmap_command = str(nmap_location + " -sP " + network + " -oX " + scan_file)
     p = subprocess.Popen(nmap_command, shell=True)
     p.communicate() #wait for scan to finish
@@ -413,10 +413,10 @@ def run_scan_on_host(host_ip, full_scan=True):
 def run_scan_on_tags(subnets_info, tags, full_scan=True, debug=False):
     subnets = []
     results = []
-    
+
     #Get a list of subnets to scan
     for tag in tags:
-        subnets.append(subnets_info.get_subnets_by_tag(tag))   
+        subnets.append(subnets_info.get_subnets_by_tag(tag))
 
     if debug == True: print "Subnets to scan: " + str(subnets)
     file_managment.logger("Subnets to scan: " + str(subnets))
@@ -442,8 +442,7 @@ instance_number = randint(1000,99999)
 file_managment.logger("Script started, instance number: " + str(instance_number))
 
 #Script start
-# script_directory = "/root/port-watcher/"
-script_directory = "/home/azureuser/port-watcher/"
+script_directory = "/root/port-watcher/"
 load_config_file(script_directory + "config.json")
 scan_directory = script_directory + "scans/"
 scan_history_file = script_directory + "scans/scan_history.txt"
@@ -451,8 +450,8 @@ hosts_directory = script_directory + "hosts/"
 schedule_file = script_directory + "schedule.csv"
 
 try:
-	#Load config and data files    
-	schedule_obj = file_managment.schedule(schedule_file) 
+	#Load config and data files
+	schedule_obj = file_managment.schedule(schedule_file)
 	subnets_info = file_managment.load_subnets_file()
 	all_hosts    = file_managment.host_list()
 	scan_history = file_managment.scan_history(scan_history_file)
@@ -461,6 +460,6 @@ try:
 	if debug_script == True: print "Scans Completed"
 	file_managment.logger("Pending scans completed.")
 	file_managment.logger("Script complete.")
-except Exception, e: 
+except Exception, e:
 	file_managment.logger("Error running script: " + str(e))
 	file_managment.logger("Traceback " + str(instance_number) + ": " + str(traceback.format_exc()))
