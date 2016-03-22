@@ -19,22 +19,31 @@ from xml.dom import minidom
 
 
 def load_config_file(file_location):
-    config_file = open(file_location)
-    json_data   = json.load(config_file)
-
     global debug_script
     global send_email
     global email_form
     global email_pass
-    global imap_username 
+    global imap_username
+    global nmap_location
 
-    debug_script = json_data['debug_script']
-    send_email = json_data['send_email']
-    email_form = json_data['from_email']
-    email_pass = json_data['email_password']
-    imap_username = json_data['email_username']
+    try:
+    	config_file = open(file_location)
+    	json_data   = json.load(config_file)
 
-    file_managment.logger("Config loaded")
+    	debug_script = json_data['debug_script']
+    	send_email = json_data['send_email']
+    	email_form = json_data['from_email']
+    	email_pass = json_data['email_password']
+    	imap_username = json_data['email_username']
+    	nmap_location = json_data['nmap_location']
+
+    	file_managment.logger("Config loaded.")
+
+    	if (debug_script == True): print "Config loaded."
+
+    except:
+	file_managment.logger("Error loading config.")
+	print "Error loading config."	
 
 def parse_nmap_xml_for_hosts(xml_doc):
     hosts_array = []
@@ -130,13 +139,25 @@ def parse_nmap_xml(xml_doc, debug=False):
 
 	return scan_results
 	
-def run_group_scan(subnets_info, group_id, debug=False):
-    #Get a list of subnets to scan
-    subnets = subnets_info.get_subnets_by_group(group_id) 
-    if debug == True: print "Subnets to scan: " + str(len(subnets))
-    file_managment.logger("Subnets to scan: " + str(len(subnets)))
+def run_group_scan(subnets_info, group_id, full_scan=True, debug=False):
+    # Get a list of subnets to scan
+    subnets = subnets_info.get_subnets_by_group(group_id)
 
-    results = run_scan(subnets, debug)
+    # Compile a String list of subnets
+    subnet_str_list = ""
+    for subnet in subnets:
+	 subnet_str_list = subnet_str_list + str(subnet.subnet) + " "
+ 
+    #create log text
+    if full_scan == True:
+	log_text = "Group ID: " + group_id + " Full scan of subnets: " + str(subnet_str_list)
+    else:
+	log_text = "Group ID: " + group_id + " Top ports scan of subnets: " + str(subnet_str_list)
+
+    if debug == True: print log_text
+    file_managment.logger(log_text)
+
+    results = run_scan(subnets, full_scan, debug)
 
     return results
 
@@ -160,7 +181,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
             for subnet in subnets_info.get_subnets_by_group(next_scan.group):
                 scanned_ips.extend(subnet.get_ips())
 
-            group_results = run_group_scan(subnets_info, next_scan.group, debug)
+            group_results = run_group_scan(subnets_info, next_scan.group, next_scan.full_scan, debug)
         else:
 	    group_results = []
  
@@ -172,7 +193,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
                 for subnet in subnets_info.get_subnets_by_tag(tag):
                     scanned_ips.extend(subnet.get_ips())
                 
-            tag_results = run_scan_on_tags(subnets_info, next_scan.tags, debug)
+            tag_results = run_scan_on_tags(subnets_info, next_scan.tags, next_scan.full_scan, debug)
 	else:
             tag_results = []
 
@@ -212,11 +233,11 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 
 			if latest_scans[0] is None:
 				existing_hosts.remove(str(scanned_ip))
-				file_managment.logger("Removing missing host from list, because last scan did not exist.")
+				file_managment.logger("Removing missing host: " + str(scanned_ip) + " from list, because last scan did not exist.")
 			else:
 				if len(latest_scans[0].open_ports) == 0:
 					existing_hosts.remove(str(scanned_ip))
-					file_managment.logger("Removing missing host from list, because last scan was empty.")				
+					file_managment.logger("Removing missing host: " + str(scanned_ip) + " from list, because last scan was empty.")				
 
 					# Open a new scan, recording that the host was not found.
 					new_host.open_new_scan(str(int(time.time())), False)
@@ -229,9 +250,15 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 			file_managment.logger("Error creating blank scan for missing host. " + str(e))	
 
         if (send_email == True):
-            # send_email    = False
+            send_email    = False
             email_subject = "Port Watcher Scan For: " +  next_scan.name
             email_body    = email_subject + "\n"
+
+	    if next_scan.full_scan == True:
+		email_body += "Type: Full port scan.\n"
+	    else:
+		email_body += "Type: Top ports scan.\n"
+
             email_body   += "Time elapsed: " + time_delta + "\n\n"
             
 	    if len(group_results) == 0 and len(tag_results[0]) == 0:
@@ -264,7 +291,6 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 		        host_count += 1
 		    else:
 			host_info  += "No changes"
-			send_email  = True
 
             for result in tag_results[0]:
                 for host in result:
@@ -289,7 +315,6 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 			host_count += 1
                     else:
                         host_info  += "No changes"
-                        send_email  = True
 
             # Output host found in previous scans, but not in latest
             if (len(existing_hosts) > 0):
@@ -298,13 +323,19 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
                 
                 for host_ip in existing_hosts:
                     email_body += host_ip + "\n\t"
+			
+		    # Record a new blank scan since the host was not found
+		    new_missing_host = file_managment.get_host(str(host_ip), "IPv4")
+		    new_missing_host.open_new_scan(str(int(time.time())), False)
+		    new_missing_host.write_json()
+		    file_managment.logger("Host " + str(new_missing_host.host_ip) + " JSON updated - Recorded blank scan for missing host.")
 
 	    if (host_count == 0):
 		email_body += "No changes found.\n"
                 
             #Send Email
             if (send_email == True):
-                au_email.send_email('mailout.american.edu', email_form, imap_username, email_pass, 'security@american.edu', email_subject, email_body)
+                au_email.send_email('mailout.american.edu', email_form, imap_username, email_pass, 'dhuse@american.edu', email_subject, email_body)
                 if debug == True: print "Email Sent."
 		file_managment.logger("Email Sent.")
             else:
@@ -315,7 +346,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
         if debug == True: print "No scans pending."
         file_managment.logger("No scans pending.")
 
-def run_scan(subnets, debug=False):
+def run_scan(subnets, full_scan=True, debug=False):
     hosts_arr = []
     results = []
     
@@ -328,7 +359,12 @@ def run_scan(subnets, debug=False):
 
     #Scan every port of detected hosts
     for host_entry in hosts_arr:
-	file_managment.logger("Running scan on host: " + host_entry[0])
+        if full_scan == True:
+                log_text = "Running full scan on host: " + host_entry[0]
+        else:
+                log_text = "Running top ports scan on host: " + host_entry[0]
+
+        file_managment.logger(log_text)
         run_scan_on_host(host_entry[0])
         
 	file_managment.logger("Parsing scan for host: " + host_entry[0])
@@ -360,15 +396,21 @@ def run_scan_for_hosts(network):
     p = subprocess.Popen(nmap_command, shell=True)
     p.communicate() #wait for scan to finish
 
-def run_scan_on_host(host_ip):
+def run_scan_on_host(host_ip, full_scan=True):
     scan_file = scan_directory + "latest_scan." + str(instance_number) + ".xml"
-    nmap_command = str(nmap_location + " -sS -p 1-65535 " + host_ip + " -oX " + scan_file)
-    # nmap_command = str(nmap_location + " --top-ports 400 " + host_ip + " -oX " + scan_file)
+
+    if full_scan == True:
+	# Run the full port scan
+    	#nmap_command = str(nmap_location + " -sS -p 1-65535 " + host_ip + " -oX " + scan_file)
+    	nmap_command = str(nmap_location + " --top-ports 400 " + host_ip + " -oX " + scan_file)
+    else:
+	# Run top ports scan only
+	nmap_command = str(nmap_location + " --top-ports 1000 " + host_ip + " -oX " + scan_file)
 
     p = subprocess.Popen(nmap_command, shell=True)
     p.communicate() #wait for scan to finish
 
-def run_scan_on_tags(subnets_info, tags, debug=False):
+def run_scan_on_tags(subnets_info, tags, full_scan=True, debug=False):
     subnets = []
     results = []
     
@@ -381,41 +423,32 @@ def run_scan_on_tags(subnets_info, tags, debug=False):
 
     if len(subnets) > 0:
         for subnet in subnets:
-            if debug == True: print "Scanning: " + str(subnet)
-	    file_managment.logger("Scanning: " + str(subnet))
-            scan_results = run_scan(subnet, debug)
+	    if full_scan == True:
+		log_text = "Full scan of " + str(subnet[0].subnet)
+	    else:
+		log_text = "Top ports scan of " + str(subnet[0].subnet)
+
+            if debug == True: print log_text
+	    file_managment.logger(log_text)
+
+            scan_results = run_scan(subnet, full_scan, debug)
             results.append(scan_results)
 
     return results
 
 #######################
 
-file_managment.logger("Script started.")
-
-#NMAP Locations
-nmap_osx      = "/usr/local/bin/nmap"
-nmap_ubuntu   = "/usr/bin/nmap"
-nmap_windows  = ""
-nmap_location = ""
+instance_number = randint(1000,99999)
+file_managment.logger("Script started, instance number: " + str(instance_number))
 
 #Script start
-load_config_file("/root/port-watcher/config.json")
-scan_directory = "/root/port-watcher/scans/"
-scan_history_file = "/root/port-watcher/scans/scan_history.txt"
-hosts_directory = "/root/port-watcher/hosts/"
-schedule_file = "/root/port-watcher/schedule.csv"
-instance_number = randint(1000,99999)
-
-# Determin OS
-if _platform == "linux" or _platform == "linux2":
-    # linux
-    nmap_location = nmap_ubuntu
-elif _platform == "darwin":
-    # OS X
-    nmap_location = nmap_osx
-elif _platform == "win32":
-    # Windows
-    nmap_location = nmap_windows
+# script_directory = "/root/port-watcher/"
+script_directory = "/home/azureuser/port-watcher/"
+load_config_file(script_directory + "config.json")
+scan_directory = script_directory + "scans/"
+scan_history_file = script_directory + "scans/scan_history.txt"
+hosts_directory = script_directory + "hosts/"
+schedule_file = script_directory + "schedule.csv"
 
 try:
 	#Load config and data files    
@@ -430,4 +463,4 @@ try:
 	file_managment.logger("Script complete.")
 except Exception, e: 
 	file_managment.logger("Error running script: " + str(e))
-	file_managment.logger("Traceback: " + str(traceback.format_exc()))
+	file_managment.logger("Traceback " + str(instance_number) + ": " + str(traceback.format_exc()))

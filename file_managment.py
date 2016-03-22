@@ -213,27 +213,36 @@ class schedule:
         return next_entry_to_run;
         
     def load_schedule_file(self):
+	logger("Loading schedule file.")
         first_line = True
     
-        with open(self.file_name, 'rb') as f:
-            reader = csv.reader(f)
+	try:
+        	with open(self.file_name, 'rb') as f:
+            		reader = csv.reader(f)
+		
+            		for row in reader:
+                		if (first_line == False):
+                    			task_name     = row[0].strip()
+                    			group         = row[1].strip()
+		    			minimum_hours = row[4].strip()
+                    			last_scan     = row[5].strip()
 
-            for row in reader:
-                if (first_line == False):
-                    task_name     = row[0].strip()
-                    group         = row[1].strip()
-                    minimum_hours = row[3].strip()
-                    last_scan     = row[4].strip()
+					if row[3].strip().lower() == "true":
+						full_scan = True
+					else:
+						full_scan = False
 
-                    if len(row[2].strip()) > 0:
-                        tags = row[2].strip().split()
-                    else:
-                        tags = []
+                    			if len(row[2].strip()) > 0:
+                        			tags = row[2].strip().split()
+                    			else:
+                        			tags = []
 
-                    self.entries.append(schedule_entry(task_name, group, tags, minimum_hours, last_scan))
-                else:
-                    #Skip first line because it is documentation
-                    first_line = False
+                    			self.entries.append(schedule_entry(task_name, group, tags, full_scan, minimum_hours, last_scan))
+                		else:
+                    			#Skip first line because it is documentation
+                    			first_line = False
+	except:
+		logger("Error opening scan schedule file: " + self.file_name)
 
     def write_schedule(self):
         csv_file = open(self.file_name, 'w')
@@ -244,7 +253,7 @@ class schedule:
             for tag in entry.tags:
                 tags_str = tags_str + tag + " "
                 
-            csv_file.write(entry.name + ", " + entry.group + ", " + tags_str + ", " + str(entry.min_hours) + ", " + str(entry.last_scan) + '\n')
+            csv_file.write(entry.name + ", " + entry.group + ", " + tags_str + ", " + str(entry.full_scan) + ", " + str(entry.min_hours) + ", " + str(entry.last_scan) + '\n')
                 
         csv_file.close()
 
@@ -252,13 +261,15 @@ class schedule_entry:
     name = ""
     group = ""
     tags  = ""
+    full_scan = True
     min_hours = 24
     last_scan = 0
     
-    def __init__(self, name, group, tags, min_hours, last_scan):
+    def __init__(self, name, group, tags, full_scan, min_hours, last_scan):
         self.name = name
         self.group = group
         self.tags  = tags
+	self.full_scan = full_scan
         self.min_hours = min_hours
         self.last_scan = last_scan
 
