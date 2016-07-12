@@ -17,34 +17,6 @@ from random import randint
 from sys import platform as _platform
 from xml.dom import minidom
 
-
-def load_config_file(file_location):
-    global debug_script
-    global send_email
-    global email_form
-    global email_pass
-    global imap_username
-    global nmap_location
-
-    try:
-    	config_file = open(file_location)
-    	json_data   = json.load(config_file)
-
-    	debug_script = json_data['debug_script']
-    	send_email = json_data['send_email']
-    	email_form = json_data['from_email']
-    	email_pass = json_data['email_password']
-    	imap_username = json_data['email_username']
-    	nmap_location = json_data['nmap_location']
-
-    	file_managment.logger("Config loaded.")
-
-    	if (debug_script == True): print "Config loaded."
-
-    except:
-	file_managment.logger("Error loading config.")
-	print "Error loading config."
-
 def parse_nmap_xml_for_hosts(xml_doc):
     hosts_array = []
     doc = minidom.parse(xml_doc)
@@ -335,7 +307,7 @@ def run_next_scan(subnets_info, schedule_obj, send_email=True, debug=False):
 
             #Send Email
             if (send_email == True):
-                au_email.send_email('mailout.american.edu', email_form, imap_username, email_pass, 'email@domain.com', email_subject, email_body)
+                au_email.send_email('email.server.com', email_from, imap_username, email_pass, 'emailto@server.com', email_subject, email_body)
                 if debug == True: print "Email Sent."
 		file_managment.logger("Email Sent.")
             else:
@@ -438,28 +410,54 @@ def run_scan_on_tags(subnets_info, tags, full_scan=True, debug=False):
 
 #######################
 
-instance_number = randint(1000,99999)
-file_managment.logger("Script started, instance number: " + str(instance_number))
+def main():
+	global debug_script
+	global send_email
+	global email_from
+	global email_pass
+	global imap_username
+	global nmap_location
 
-#Script start
-script_directory = "/root/port-watcher/"
-load_config_file(script_directory + "config.json")
-scan_directory = script_directory + "scans/"
-scan_history_file = script_directory + "scans/scan_history.txt"
-hosts_directory = script_directory + "hosts/"
-schedule_file = script_directory + "schedule.csv"
+	global script_directory
+	global scan_directory
+	global scan_history_file
+	global hosts_directory
+	global instance_number
 
-try:
-	#Load config and data files
-	schedule_obj = file_managment.schedule(schedule_file)
-	subnets_info = file_managment.load_subnets_file()
-	all_hosts    = file_managment.host_list()
-	scan_history = file_managment.scan_history(scan_history_file)
+	instance_number = randint(1000,99999)
+	file_managment.logger("Script started, instance number: " + str(instance_number))
 
-	run_next_scan(subnets_info, schedule_obj, send_email, debug_script)
-	if debug_script == True: print "Scans Completed"
-	file_managment.logger("Pending scans completed.")
-	file_managment.logger("Script complete.")
-except Exception, e:
-	file_managment.logger("Error running script: " + str(e))
-	file_managment.logger("Traceback " + str(instance_number) + ": " + str(traceback.format_exc()))
+	#Script start
+	script_directory = "/root/port-watcher/"
+	# script_directory = "/home/azureuser/port-watcher/"
+	config_options = file_managment.load_config_file(script_directory + "config.json")
+
+	debug_script = config_options['debug_script']
+	send_email = config_options['send_email']
+	email_from = config_options['email_from']
+	email_pass = config_options['email_pass']
+	imap_username = config_options['imap_username']
+	nmap_location = config_options['nmap_location']
+
+	scan_directory = script_directory + "scans/"
+	scan_history_file = script_directory + "scans/scan_history.txt"
+	hosts_directory = script_directory + "hosts/"
+	schedule_file = script_directory + "schedule.csv"
+
+	try:
+		#Load config and data files
+		schedule_obj = file_managment.schedule(schedule_file)
+		subnets_info = file_managment.load_subnets_file()
+		all_hosts    = file_managment.host_list()
+		scan_history = file_managment.scan_history(scan_history_file)
+
+		run_next_scan(subnets_info, schedule_obj, send_email, debug_script)
+		if debug_script == True: print "Scans Completed"
+		file_managment.logger("Pending scans completed.")
+		file_managment.logger("Script complete.")
+	except Exception, e:
+		file_managment.logger("Error running script: " + str(e))
+		file_managment.logger("Traceback " + str(instance_number) + ": " + str(traceback.format_exc()))
+
+# run script
+main()
