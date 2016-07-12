@@ -1,6 +1,7 @@
 {
 	"debug_script":   	false,
 	"send_email":		true,
+	"nmap_location":    "/usr/bin/nmap",
 	"from_email":		"Port-Watcher@somedomain.com",
 	"email_password": 	"password",
 	"email_username": 	"Port-Watcher"

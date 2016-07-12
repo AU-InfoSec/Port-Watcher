@@ -23,20 +23,20 @@ class host_list:
         else:
             self.hosts_list.append(host_ip_string)
             self.write_host_list()
-            
+
     def open_hosts_list(self):
         file_path = hosts_directory + "all_hosts.json"
-        
+
         if os.path.exists(file_path):
             json_file = open(file_path)
             json_data = json.load(json_file)
-            
-            self.hosts_list = json_data["hosts"]; 
+
+            self.hosts_list = json_data["hosts"];
         else:
             # File does not exist create a blank one.
             self.hosts_list = []
             self.write_host_list();
-            
+
     def write_host_list(self):
         file_path = hosts_directory + "all_hosts.json"
         list_obj  = {}
@@ -65,12 +65,12 @@ class scan_host:
     scans       = []
     latest_scan = None
     is_new      = False
-    
+
     def __init__(self, host_ip_string, ip_version, is_new, host_names=[]):
         self.scans  = []
         self.is_new = is_new
-        self.host_names = host_names 
-        
+        self.host_names = host_names
+
         if ip_version.lower() == "ipv4":
             self.host_ip = ipaddr.IPv4Address(host_ip_string)
         elif ip_version.lower() == "ipv6":
@@ -100,12 +100,12 @@ class scan_host:
             return changes
         else:
             return []
-        
+
     def find_newly_open_ports(self):
         """Returns a list of ports open in latest scan that were not open in previous scans."""
         if len(self.scans) > 1:
             latest_scans = self.get_latest_scans();
-            
+
             if latest_scans[0] == None:
                 scan0 = set([])
             else:
@@ -115,9 +115,9 @@ class scan_host:
                 scan1 = set([])
             else:
                 scan1 = set(latest_scans[1].open_ports)
-               
+
             changes = list(scan0 - scan1)
-            
+
             return changes
         elif len(self.scans) == 1:
             return self.scans[0].open_ports
@@ -134,7 +134,7 @@ class scan_host:
         latest_time = 0
         latest_scan = None
         second_latest_scan = None
-        
+
         for scan in self.scans:
             if scan.unix_time > latest_time:
                 second_latest_scan = latest_scan
@@ -142,23 +142,23 @@ class scan_host:
                 latest_scan = scan
 
         return [latest_scan, second_latest_scan]
-    
+
     def open_new_scan(self, unix_time, host_found):
 	if (host_found == False):
 		logger("Saving empty scan.")
 
         self.latest_scan = scan_instance(unix_time, [], host_found)
         self.scans.append(self.latest_scan)
-        
+
     def write_json(self):
         scans_list = []
         for scan in self.scans:
             scan_obj = {}
             scan_obj["unix_time"]  = int(scan.unix_time)
-            scan_obj["open_ports"] = scan.open_ports            
+            scan_obj["open_ports"] = scan.open_ports
 	    scan_obj["host_found"] = scan.host_found
             scans_list.append(scan_obj)
-            
+
         json_data = {}
         json_data["host_ip"] = str(self.host_ip)
         json_data["host_names"] = self.host_names
@@ -167,7 +167,7 @@ class scan_host:
         json_file = hosts_directory + str(self.host_ip) + ".json"
         with open(json_file, 'w') as outfile:
             json.dump(json_data, outfile)
-        
+
 class scan_instance:
     unix_time = 0;
     open_ports = []
@@ -184,23 +184,27 @@ class scan_instance:
     def add_open_port(self, port_number):
         self.open_ports.append(int(port_number))
 
+    def get_unix_time(self):
+	return self.unix_time
+
+
 class schedule:
     file_name = "schedule.csv"
     entries   = []
-    
+
     def __init__(self, file_name):
         self.file_name = file_name
         self.load_schedule_file();
-        
+
     def get_next_schedule_entry(self, debug=False):
         """Returns the next schedule entry that needs to run, returns None if there are no entries to run."""
         longest_time      = 0
         next_entry_to_run = None
         scan_count        = 0
-        
+
         for entry in self.entries:
             time_since_last_run = (int(time.time()) - int(entry.last_scan))
-            
+
             if (time_since_last_run > (int(entry.min_hours) * 3600)):
                 if time_since_last_run > longest_time:
                     scan_count = scan_count + 1
@@ -211,60 +215,71 @@ class schedule:
 	logger("Found " + str(scan_count) + " scan(s) pending.")
 
         return next_entry_to_run;
-        
+
     def load_schedule_file(self):
+	logger("Loading schedule file.")
         first_line = True
-    
-        with open(self.file_name, 'rb') as f:
-            reader = csv.reader(f)
 
-            for row in reader:
-                if (first_line == False):
-                    task_name     = row[0].strip()
-                    group         = row[1].strip()
-                    minimum_hours = row[3].strip()
-                    last_scan     = row[4].strip()
+	try:
+        	with open(self.file_name, 'rb') as f:
+            		reader = csv.reader(f)
 
-                    if len(row[2].strip()) > 0:
-                        tags = row[2].strip().split()
-                    else:
-                        tags = []
+            		for row in reader:
+                		if (first_line == False):
+                    			task_name     = row[0].strip()
+                    			group         = row[1].strip()
+		    			minimum_hours = row[4].strip()
+                    			last_scan     = row[5].strip()
 
-                    self.entries.append(schedule_entry(task_name, group, tags, minimum_hours, last_scan))
-                else:
-                    #Skip first line because it is documentation
-                    first_line = False
+					if row[3].strip().lower() == "true":
+						full_scan = True
+					else:
+						full_scan = False
+
+                    			if len(row[2].strip()) > 0:
+                        			tags = row[2].strip().split()
+                    			else:
+                        			tags = []
+
+                    			self.entries.append(schedule_entry(task_name, group, tags, full_scan, minimum_hours, last_scan))
+                		else:
+                    			#Skip first line because it is documentation
+                    			first_line = False
+	except:
+		logger("Error opening scan schedule file: " + self.file_name)
 
     def write_schedule(self):
         csv_file = open(self.file_name, 'w')
-        csv_file.write('task name, group, tags, minimum hours between scans, last scan time\n')
+        csv_file.write('task name, group, tags, full scan, minimum hours between scans, last scan time\n')
 
         for entry in self.entries:
             tags_str = ""
             for tag in entry.tags:
                 tags_str = tags_str + tag + " "
-                
-            csv_file.write(entry.name + ", " + entry.group + ", " + tags_str + ", " + str(entry.min_hours) + ", " + str(entry.last_scan) + '\n')
-                
+
+            csv_file.write(entry.name + ", " + entry.group + ", " + tags_str + ", " + str(entry.full_scan) + ", " + str(entry.min_hours) + ", " + str(entry.last_scan) + '\n')
+
         csv_file.close()
 
 class schedule_entry:
     name = ""
     group = ""
     tags  = ""
+    full_scan = True
     min_hours = 24
     last_scan = 0
-    
-    def __init__(self, name, group, tags, min_hours, last_scan):
+
+    def __init__(self, name, group, tags, full_scan, min_hours, last_scan):
         self.name = name
         self.group = group
         self.tags  = tags
+	self.full_scan = full_scan
         self.min_hours = min_hours
         self.last_scan = last_scan
 
     def __str__(self):
         return "Name: " + self.name + " - Group: " + self.group + " - Tags: " + str(self.tags) + " - Frequency: " + self.min_hours + "h"
-    
+
 class subnets_data:
     subnets = []
 
@@ -285,19 +300,19 @@ class subnets_data:
 
     def get_ips(self):
         ips = []
-        
+
         for subnet in self.subnets:
             ips.extend(subnet.get_ips())
 
         return ips
-    
+
     def get_subnets_by_group(self, group):
         subnets_in_group = []
-        
+
         for subnet in self.subnets:
             if subnet.group == group:
                 subnets_in_group.append(subnet)
-                
+
         return subnets_in_group
 
     def get_subnets_by_tag(self, tag):
@@ -309,19 +324,19 @@ class subnets_data:
                     subnets_with_tag.append(subnet)
 
         return subnets_with_tag
-        
+
 class subnet_info:
-    subnet  = '127.0.0.0/32' 
+    subnet  = '127.0.0.0/32'
     group   = 'local hosts'
     tag     = 'local'
     comment = 'local machine'
 
     def __init__(self, subnet, group, tag, comment):
         self.subnet  = subnet
-        self.group   = group 
+        self.group   = group
         self.tag     = tag
         self.comment = comment
-        
+
     def __str__(self):
         return self.subnet + ", " + self.group + ", " + self.tag + ", " + self.comment
 
@@ -329,12 +344,12 @@ class subnet_info:
         ips = []
         for ip in ipaddr.IPv4Network(self.subnet).iterhosts():
             ips.append(str(ip))
-            
+
         return ips
 
 def get_host(ip_str, ip_ver):
     host_filename = hosts_directory + ip_str + ".json"
-    
+
     if os.path.isfile(host_filename):
         file_data = open(host_filename)
         json_data = json.load(file_data)
@@ -347,7 +362,7 @@ def get_host(ip_str, ip_ver):
         for scan in scans:
             unix_time  = scan['unix_time']
             open_ports = scan['open_ports']
-	    
+
 	    if 'host_found' in scan:
 		host_found = scan['host_found']
 	    else:
@@ -360,11 +375,40 @@ def get_host(ip_str, ip_ver):
 
     return host_obj
 
+def load_config_file(file_location):
+    try:
+        config_file = open(file_location)
+        json_data   = json.load(config_file)
+
+        debug_script = json_data['debug_script']
+        send_email = json_data['send_email']
+        email_from = json_data['from_email']
+        email_pass = json_data['email_password']
+        imap_username = json_data['email_username']
+        nmap_location = json_data['nmap_location']
+
+        logger("Config loaded.")
+
+        if (debug_script == True): print "Config loaded."
+
+	return {
+		'debug_script':  debug_script,
+		'send_email':	 send_email,
+		'email_from':	 email_from,
+		'email_pass':    email_pass,
+		'imap_username': imap_username,
+		'nmap_location': nmap_location
+	}
+
+    except:
+        logger("Error loading config.")
+        print "Error loading config."
+
 def load_subnets_file():
     first_line   = True
     subnets_file = "/root/port-watcher/subnets.csv"
     subnets_db   = subnets_data()
-    
+
     with open(subnets_file, 'rb') as f:
         reader = csv.reader(f)
 
@@ -375,7 +419,7 @@ def load_subnets_file():
                 tag      = row[2].strip()
                 comment  = row[3].strip()
                 c_subnet = subnet_info(subnet, group, tag, comment)
-                
+
                 subnets_db.append(c_subnet)
             else:
                 #Skip first line because it is documentation

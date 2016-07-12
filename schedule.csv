@@ -1,2 +1,2 @@
-task name, group, tags, minimum hours between scans, last scan time
-Test Scan, , LocalHost , 1, 1445910554
+task name, group, tags, full scan, minimum hours between scans, last scan time
+Test Scan, , LocalHost , True, 1, 1445910554
