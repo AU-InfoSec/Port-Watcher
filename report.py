@@ -4,7 +4,7 @@ import datetime
 import file_managment
 
 # Print report header
-print "AU Open Ports Report"
+print "Open Ports Report"
 print "Report date: " + str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 print "--------------------------------"
 print ""
